@@ -4315,75 +4315,52 @@ static char_u *skip_grep_pat(exarg_T *eap)
   return p;
 }
 
-/*
- * For the ":make" and ":grep" commands insert the 'makeprg'/'grepprg' option
- * in the command line, so that things like % get expanded.
- */
+// For the ":make" and ":grep" commands insert the 'makeprg'/'grepprg' option
+// in the command line.
 static char_u *replace_makeprg(exarg_T *eap, char_u *p, char_u **cmdlinep)
 {
-  char_u *new_cmdline;
-  char_u *program;
-  char_u *pos;
-  char_u *ptr;
-  int len;
-  int i;
+  bool is_make = eap->cmdidx == CMD_make || eap->cmdidx == CMD_lmake;
+  bool is_grep = eap->cmdidx == CMD_grep || eap->cmdidx == CMD_lgrep ||
+    eap->cmdidx == CMD_grepadd || eap->cmdidx == CMD_lgrepadd;
 
-  /*
-   * Don't do it when ":vimgrep" is used for ":grep".
-   */
-  if ((eap->cmdidx == CMD_make || eap->cmdidx == CMD_lmake
-       || eap->cmdidx == CMD_grep || eap->cmdidx == CMD_lgrep
-       || eap->cmdidx == CMD_grepadd
-       || eap->cmdidx == CMD_lgrepadd)
-      && !grep_internal(eap->cmdidx)) {
-    if (eap->cmdidx == CMD_grep || eap->cmdidx == CMD_lgrep
-        || eap->cmdidx == CMD_grepadd || eap->cmdidx == CMD_lgrepadd) {
-      if (*curbuf->b_p_gp == NUL) {
-        program = p_gp;
-      } else {
-        program = curbuf->b_p_gp;
-      }
-    } else {
-      if (*curbuf->b_p_mp == NUL) {
-        program = p_mp;
-      } else {
-        program = curbuf->b_p_mp;
-      }
-    }
-
-    p = skipwhite(p);
-
-    if ((pos = (char_u *)strstr((char *)program, "$*")) != NULL) {
-      // replace $* by given arguments
-      i = 1;
-      while ((pos = (char_u *)strstr((char *)pos + 2, "$*")) != NULL) {
-        ++i;
-      }
-      len = (int)STRLEN(p);
-      new_cmdline = xmalloc(STRLEN(program) + i * (len - 2) + 1);
-      ptr = new_cmdline;
-      while ((pos = (char_u *)strstr((char *)program, "$*")) != NULL) {
-        i = (int)(pos - program);
-        memcpy(ptr, program, i);
-        STRCPY(ptr += i, p);
-        ptr += len;
-        program = pos + 2;
-      }
-      STRCPY(ptr, program);
-    } else {
-      new_cmdline = xmalloc(STRLEN(program) + STRLEN(p) + 2);
-      STRCPY(new_cmdline, program);
-      STRCAT(new_cmdline, " ");
-      STRCAT(new_cmdline, p);
-    }
-    msg_make(p);
-
-    // 'eap->cmd' is not set here, because it is not used at CMD_make
-    xfree(*cmdlinep);
-    *cmdlinep = new_cmdline;
-    p = new_cmdline;
+  char *program;
+  if (is_grep && !grep_internal(eap->cmdidx)) {
+    program = (char *)((*curbuf->b_p_gp == NUL) ? p_gp : curbuf->b_p_gp);
+  } else if (is_make) {
+    program = (char *)((*curbuf->b_p_mp == NUL) ? p_mp : curbuf->b_p_mp);
+  } else {
+    return p; // Not `:(l)(make|grep) or `grepprg=internal` which is :vimgrep.
   }
-  return p;
+
+  p = skipwhite(p);
+
+  char *new_cmdline;
+  size_t n = strstrcnt(program, "$*");
+  if (n != 0) {
+    // Replace every occurrence of $* by the arguments (`p`).
+    new_cmdline = xmallocz(strlen(program) + n * STRLEN(p) - n * strlen("$*"));
+    char *ptr = new_cmdline;
+    char *pos;
+    while ((pos = strstr(program, "$*")) != NULL) {
+      ptr = xmempcpy(ptr, program, pos - program); // Copy program up to $*.
+      ptr = xstpcpy(ptr, (char *)p); // Copy the arguments.
+      program = pos + 2; // Skip over $*, then repeat.
+    }
+    strcpy(ptr, program); // Copy leftovers.
+  } else {
+    // Append the given arguments to `makeprg`/`grepprg`.
+    new_cmdline = xmallocz(strlen(program) + STRLEN(p) + 1);
+    char *ptr = new_cmdline;
+    ptr = xstpcpy(ptr, program);
+    ptr = xstpcpy(ptr, " ");
+    strcpy(ptr, (char *)p);
+  }
+  msg_make(p);
+
+  // 'eap->cmd' is not set here, because it is not used at CMD_make
+  xfree(*cmdlinep);
+  *cmdlinep = (char_u *)new_cmdline;
+  return *cmdlinep;
 }
 
 // Expand file name in Ex command argument.

@@ -204,6 +204,19 @@ void *xmemdupz(const void *data, size_t len)
   return memcpy(xmallocz(len), data, len);
 }
 
+// Copies `n` bytes from `src` to `dst`. Returns `dst`+`n`. Same as memcpy(3) 
+// except that it returns the end of the buffer.
+//
+// @see {memcpy}
+// @param dst Destination address
+// @param src Source address
+// @param n Number of bytes to copy
+void *xmempcpy(void *dst, const void *src, size_t n)
+  FUNC_ATTR_NONNULL_RET FUNC_ATTR_WARN_UNUSED_RESULT FUNC_ATTR_NONNULL_ALL
+{
+  return (void *)((char *)memcpy(dst, src, n) + n);
+}
+
 /// A version of strchr() that returns a pointer to the terminating NUL if it
 /// doesn't find `c`.
 ///
@@ -297,6 +310,25 @@ size_t memcnt(const void *data, char c, size_t len)
   while ((ptr = memchr(ptr, c, (size_t)(end - ptr))) != NULL) {
     cnt++;
     ptr++;  // Skip the instance of c.
+  }
+  return cnt;
+}
+
+/// Counts the number of non-overlapping occurrences of `needle` in `str`.
+///
+/// @see strcnt
+///
+/// @param str     Pointer to the string to search.
+/// @param needle  The byte to search for.
+/// @returns the number of occurrences of `c` in `str`.
+size_t strstrcnt(const char *str, const char *needle)
+  FUNC_ATTR_NONNULL_ALL FUNC_ATTR_PURE
+{
+  size_t cnt = 0;
+  size_t needlelen = strlen(needle);
+  while ((str = strstr(str, needle)) != NULL) {
+    cnt++;
+    str += needlelen;
   }
   return cnt;
 }
