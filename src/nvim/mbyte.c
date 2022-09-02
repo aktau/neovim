@@ -2317,7 +2317,7 @@ enc_locale_copy_enc:
  * Returns (void *)-1 if failed.
  * (should return iconv_t, but that causes problems with prototypes).
  */
-void *my_iconv_open(char_u *to, char_u *from)
+void *my_iconv_open(const char_u *to, const char_u *from)
 {
   iconv_t fd;
 # define ICONV_TESTLEN 400
@@ -2448,15 +2448,16 @@ static char_u *iconv_string(const vimconv_T *const vcp, char_u *str, size_t slen
 /// Afterwards invoke with "from" and "to" equal to NULL to cleanup.
 ///
 /// @return  FAIL when conversion is not supported, OK otherwise.
-int convert_setup(vimconv_T *vcp, char *from, char *to)
+int convert_setup(vimconv_T *vcp, const char *from, const char *to)
 {
-  return convert_setup_ext(vcp, (char_u *)from, true, (char_u *)to, true);
+  return convert_setup_ext(vcp, (const char_u *)from, true, (const char_u *)to, true);
 }
 
 /// As convert_setup(), but only when from_unicode_is_utf8 is true will all
 /// "from" unicode charsets be considered utf-8.  Same for "to".
-int convert_setup_ext(vimconv_T *vcp, char_u *from, bool from_unicode_is_utf8, char_u *to,
-                      bool to_unicode_is_utf8)
+int convert_setup_ext(vimconv_T *vcp, 
+                      const char_u *from, bool from_unicode_is_utf8,
+                      const char_u *to, bool to_unicode_is_utf8)
 {
   int from_prop;
   int to_prop;
@@ -2508,8 +2509,8 @@ int convert_setup_ext(vimconv_T *vcp, char_u *from, bool from_unicode_is_utf8, c
 #ifdef HAVE_ICONV
   else {  // NOLINT(readability/braces)
     // Use iconv() for conversion.
-    vcp->vc_fd = (iconv_t)my_iconv_open(to_is_utf8 ? (char_u *)"utf-8" : to,
-                                        from_is_utf8 ? (char_u *)"utf-8" : from);
+    vcp->vc_fd = (iconv_t)my_iconv_open(to_is_utf8 ? (const char_u *)"utf-8" : to,
+                                        from_is_utf8 ? (const char_u *)"utf-8" : from);
     if (vcp->vc_fd != (iconv_t)-1) {
       vcp->vc_type = CONV_ICONV;
       vcp->vc_factor = 4;       // could be longer too...
